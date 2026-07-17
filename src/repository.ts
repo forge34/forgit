@@ -2,13 +2,11 @@ import Branch from "./branch";
 import Commit from "./commit";
 
 class Repository {
-  public name: string;
   public branches: Branch[] = [];
   public main: Branch;
   public head: Branch | null = null;
 
-  constructor(name: string) {
-    this.name = name;
+  constructor() {
     this.main = new Branch("main", null);
     this.branches.push(this.main);
     this.head = this.main;
