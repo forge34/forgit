@@ -1,11 +1,14 @@
+import { hash } from "node:crypto";
 import {
   existsSync,
   mkdirSync,
+  readFileSync,
   realpathSync,
   statSync,
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
+import { gunzipSync, gzipSync } from "node:zlib";
 
 class Repository {
   public gitDir: string;
@@ -14,6 +17,51 @@ class Repository {
   constructor(path: string) {
     this.workTree = path;
     this.gitDir = join(path, ".git");
+  }
+
+  readObject(sha: string) {
+    const path = this.repoFile("objects", sha.slice(0, 2), sha.slice(2));
+
+    if (!existsSync(path)) {
+      return;
+    }
+
+    const data = readFileSync(path);
+
+    const raw = gunzipSync(data);
+
+    const nullIndex = raw.indexOf(0);
+
+    const header = raw.subarray(0, nullIndex).toString();
+    const body = raw.subarray(nullIndex + 1);
+
+    const [type, size] = header.split(" ");
+
+    if (body.length !== Number(size)) {
+      throw new Error("Malformed object");
+    }
+
+    switch (type) {
+      case "blob":
+        return new GitBlob(body);
+      default:
+        throw new Error("Unknown object");
+    }
+  }
+
+  writeObject(obj: GitObject) {
+    const raw = obj.serialize();
+    const header = Buffer.from(`${obj.type} ${raw.length}\0`);
+    const data = Buffer.concat([header, raw]);
+    const sha = hash("sha1", data);
+
+    const path = this.repoFile("objects", sha.slice(0, 2), sha.slice(2));
+
+    if (!existsSync(path)) {
+      writeFileSync(path, gzipSync(data));
+    }
+
+    return sha;
   }
 
   repoPath(...paths: string[]) {
