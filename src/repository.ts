@@ -1,5 +1,10 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { lstat, realpath } from "node:fs/promises";
+import {
+  existsSync,
+  mkdirSync,
+  realpathSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 
 class Repository {
@@ -15,48 +20,71 @@ class Repository {
     return join(this.gitDir, ...paths);
   }
 
-  static async repoFind(path = "."): Promise<Repository> {
-    const realPath = await realpath(path);
+  repoFile(...path: string[]) {
+    this.repoDir(true, ...path.slice(0, -1));
+    return this.repoPath(...path);
+  }
+
+  repoDir(create = false, ...path: string[]) {
+    const dir = this.repoPath(...path);
+
+    if (existsSync(dir)) {
+      const stat = statSync(dir);
+
+      if (stat.isDirectory()) {
+        return dir;
+      } else {
+        throw new Error(`Not a directory ${dir}`);
+      }
+    }
+
+    if (create) {
+      mkdirSync(dir, { recursive: true });
+      return dir;
+    } else return undefined;
+  }
+
+  static repoFind(path = "."): Repository {
+    const realPath = realpathSync(path);
     const gitDir = join(realPath, ".git");
 
-    if (existsSync(gitDir) && (await lstat(gitDir)).isDirectory()) {
+    if (existsSync(gitDir) && statSync(gitDir).isDirectory()) {
       return new Repository(realPath);
     }
 
-    const parent = await realpath(join(realPath, ".."));
+    const parent = realpathSync(join(realPath, ".."));
     if (parent === realPath) {
-      console.log("fatal: not a git repository (or any parent up to root)");
-      process.exit(1);
+      throw new Error("fatal: not a git repository (or any parent up to root)");
     }
 
     return Repository.repoFind(parent);
   }
 
-  static async init(directoryPath: string | undefined) {
+  static init(directoryPath: string | undefined) {
     const path = join(process.cwd(), directoryPath ?? ".");
     const gitDir = join(path, ".git");
 
     if (existsSync(path)) {
-      const stat = await lstat(path);
+      const stat = statSync(path);
       if (!stat.isDirectory()) {
-        console.log(`fatal: ${path} is not a directory`);
-        process.exit(1);
+        throw new Error("not a git repository");
       }
     }
 
     if (existsSync(gitDir)) {
-      console.log("fatal: .git already exists");
-      process.exit(1);
+      console.log(`fatal: .git already exists`);
     }
 
-    mkdirSync(gitDir, { recursive: true });
-    mkdirSync(join(path, ".git/objects"), { recursive: true });
-    mkdirSync(join(path, ".git/refs/heads"), { recursive: true });
-    mkdirSync(join(path, ".git/refs/tags"), { recursive: true });
-    writeFileSync(join(path, ".git/HEAD"), "ref: refs/heads/main\n");
+    const repo = new Repository(path);
+
+    mkdirSync(repo.repoPath("objects"));
+    mkdirSync(repo.repoPath("refs", "heads"));
+    mkdirSync(repo.repoPath("refs", "tags"));
+
+    writeFileSync(repo.repoPath("HEAD"), "ref: refs/heads/main\n");
     console.log("Initialized git directory");
 
-    return new Repository(path);
+    return repo;
   }
 }
 
