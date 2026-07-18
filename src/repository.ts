@@ -9,6 +9,7 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { gunzipSync, gzipSync } from "node:zlib";
+import { GitBlob, GitObject, ObjectType } from "./object";
 
 class Repository {
   public gitDir: string;
@@ -49,19 +50,38 @@ class Repository {
     }
   }
 
-  writeObject(obj: GitObject) {
+  writeObject(obj: GitObject, writeOnDisk = true) {
     const raw = obj.serialize();
     const header = Buffer.from(`${obj.type} ${raw.length}\0`);
     const data = Buffer.concat([header, raw]);
     const sha = hash("sha1", data);
 
-    const path = this.repoFile(true, "objects", sha.slice(0, 2), sha.slice(2));
+    if (writeOnDisk) {
+      const path = this.repoFile(
+        true,
+        "objects",
+        sha.slice(0, 2),
+        sha.slice(2),
+      );
 
-    if (!existsSync(path)) {
-      writeFileSync(path, gzipSync(data));
+      if (!existsSync(path)) {
+        writeFileSync(path, gzipSync(data));
+      }
     }
 
     return sha;
+  }
+
+  hashObject(path: string, type: ObjectType, write: boolean) {
+    if (!existsSync(path)) {
+      throw new Error("Path doesn't exist");
+    }
+
+    const data = readFileSync(path);
+
+    const obj = GitObject.from(type, data);
+
+    return this.writeObject(obj, write);
   }
 
   repoPath(...paths: string[]) {

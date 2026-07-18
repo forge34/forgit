@@ -1,10 +1,10 @@
-type TreeEntry = {
+export type TreeEntry = {
   mode: string;
   name: string;
   sha: string;
 };
 
-type CommitData = {
+export type CommitData = {
   tree: string;
   parents: string[];
   author: string;
@@ -12,15 +12,28 @@ type CommitData = {
   message: string;
 };
 
-type ObjectType = "blob" | "tree" | "commit" | "tag";
+export type ObjectType = "blob" | "tree" | "commit" | "tag";
 
-abstract class GitObject {
+export abstract class GitObject {
   abstract readonly type: ObjectType;
 
   abstract serialize(): Buffer;
+
+  static from(type: ObjectType, body: Buffer) {
+    switch (type) {
+      case "blob":
+        return GitBlob.deserialize(body);
+      case "tree":
+        return GitTree.deserialize(body);
+      case "commit":
+        return GitCommit.deserialize(body);
+      default:
+        throw new Error("Unknown object");
+    }
+  }
 }
 
-class GitBlob extends GitObject {
+export class GitBlob extends GitObject {
   readonly type = "blob";
 
   constructor(public content: Buffer) {
@@ -30,9 +43,13 @@ class GitBlob extends GitObject {
   serialize() {
     return this.content;
   }
+
+  static deserialize(data: Buffer) {
+    return new GitBlob(data);
+  }
 }
 
-class GitTree extends GitObject {
+export class GitTree extends GitObject {
   readonly type = "tree";
 
   constructor(public entries: TreeEntry[]) {
@@ -42,9 +59,12 @@ class GitTree extends GitObject {
   serialize() {
     return Buffer.from("eee");
   }
+  static deserialize(data: Buffer) {
+    return new GitTree([] as TreeEntry[]);
+  }
 }
 
-class GitCommit extends GitObject {
+export class GitCommit extends GitObject {
   readonly type = "commit";
 
   constructor(public content: CommitData) {
@@ -53,5 +73,8 @@ class GitCommit extends GitObject {
 
   serialize() {
     return Buffer.from("commit");
+  }
+  static deserialize(data: Buffer) {
+    return new GitCommit("" as unknown as CommitData);
   }
 }
