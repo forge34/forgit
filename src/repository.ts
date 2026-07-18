@@ -20,10 +20,10 @@ class Repository {
   }
 
   readObject(sha: string) {
-    const path = this.repoFile("objects", sha.slice(0, 2), sha.slice(2));
+    const path = this.repoFile(false, "objects", sha.slice(0, 2), sha.slice(2));
 
     if (!existsSync(path)) {
-      return;
+      throw new Error(`Object ${sha} does not exist`);
     }
 
     const data = readFileSync(path);
@@ -55,7 +55,7 @@ class Repository {
     const data = Buffer.concat([header, raw]);
     const sha = hash("sha1", data);
 
-    const path = this.repoFile("objects", sha.slice(0, 2), sha.slice(2));
+    const path = this.repoFile(true, "objects", sha.slice(0, 2), sha.slice(2));
 
     if (!existsSync(path)) {
       writeFileSync(path, gzipSync(data));
@@ -68,8 +68,8 @@ class Repository {
     return join(this.gitDir, ...paths);
   }
 
-  repoFile(...path: string[]) {
-    this.repoDir(true, ...path.slice(0, -1));
+  repoFile(create = false, ...path: string[]) {
+    this.repoDir(create, ...path.slice(0, -1));
     return this.repoPath(...path);
   }
 
@@ -120,7 +120,7 @@ class Repository {
     }
 
     if (existsSync(gitDir)) {
-      console.log(`fatal: .git already exists`);
+      throw new Error(`fatal: .git already exists`);
     }
 
     const repo = new Repository(path);

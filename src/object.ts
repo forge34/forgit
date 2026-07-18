@@ -4,7 +4,7 @@ type TreeEntry = {
   sha: string;
 };
 
-type Commit = {
+type CommitData = {
   tree: string;
   parents: string[];
   author: string;
@@ -12,8 +12,10 @@ type Commit = {
   message: string;
 };
 
+type ObjectType = "blob" | "tree" | "commit" | "tag";
+
 abstract class GitObject {
-  abstract readonly type: "blob" | "tree" | "commit" | "tag";
+  abstract readonly type: ObjectType;
 
   abstract serialize(): Buffer;
 }
@@ -33,23 +35,23 @@ class GitBlob extends GitObject {
 class GitTree extends GitObject {
   readonly type = "tree";
 
-  constructor(public content: Buffer) {
+  constructor(public entries: TreeEntry[]) {
     super();
   }
 
   serialize() {
-    return this.content;
+    return Buffer.from("eee");
   }
 }
 
 class GitCommit extends GitObject {
   readonly type = "commit";
 
-  constructor(public content: Buffer) {
+  constructor(public content: CommitData) {
     super();
   }
 
   serialize() {
-    return this.content;
+    return Buffer.from("commit");
   }
 }
